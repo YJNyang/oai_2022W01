@@ -35,27 +35,24 @@
 #include "nfapi/oai_integration/vendor_ext.h"
 
 extern RAN_CONTEXT_t RC;
-extern uint16_t sl_ahead;//add_yjn
-extern int num_delay;  //add_yjn
 
-int get_future_ul_tti_req_ind(frame_t frame, sub_frame_t slot);//add_yjn
+
 void nr_fill_nfapi_pucch(module_id_t mod_id,
                          frame_t frame,
                          sub_frame_t slot,
-                         const NR_sched_pucch_t *pucch,//const NR_sched_pucch_t *pucch,//add_yjn_test
+                         const NR_sched_pucch_t *pucch,
                          int UE_id)
 {
   NR_UE_info_t *UE_info = &RC.nrmac[mod_id]->UE_info;
-  frame_t pucch_frame = (pucch->frame + 1)%1024; //add_yjn_test
-  int future_index = get_future_ul_tti_req_ind(pucch_frame, pucch->ul_slot);//add_yjn
+
   nfapi_nr_ul_tti_request_t *future_ul_tti_req =
-      &RC.nrmac[mod_id]->UL_tti_req_ahead[0][future_index];//add_yjn
-  AssertFatal(future_ul_tti_req->SFN == pucch_frame  //add_yjn_test
+      &RC.nrmac[mod_id]->UL_tti_req_ahead[0][pucch->ul_slot];
+  AssertFatal(future_ul_tti_req->SFN == pucch->frame
               && future_ul_tti_req->Slot == pucch->ul_slot,
               "future UL_tti_req's frame.slot %d.%d does not match PUCCH %d.%d\n",
               future_ul_tti_req->SFN,
               future_ul_tti_req->Slot,
-              pucch_frame,  //add_yjn_test
+              pucch->frame,
               pucch->ul_slot);
   future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pdu_type = NFAPI_NR_UL_CONFIG_PUCCH_PDU_TYPE;
   future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pdu_size = sizeof(nfapi_nr_pucch_pdu_t);
@@ -68,7 +65,7 @@ void nr_fill_nfapi_pucch(module_id_t mod_id,
         pucch->dai_c>0 ? "pucch_acknak" : "",
         frame,
         slot,
-        pucch_frame,  //add_yjn_test
+        pucch->frame,
         pucch->ul_slot,
         pucch->sr_flag,
         pucch->dai_c,
@@ -136,12 +133,8 @@ void nr_schedule_pucch(int Mod_idP,
                        sub_frame_t slotP)
 {
   gNB_MAC_INST *nrmac = RC.nrmac[Mod_idP];
-  //LOG_I(NR_MAC,"[yjn]nr_schedule_pucch in\n");
   if (!is_xlsch_in_slot(nrmac->ulsch_slot_bitmap[slotP / 64], slotP))
-  {
-      //LOG_I(NR_MAC,"[yjn]is_xlsch_in_slot return\n");
-      return;
-  }
+    return;
 
   NR_UE_info_t *UE_info = &nrmac->UE_info;
   const NR_list_t *UE_list = &UE_info->list;
@@ -150,13 +143,11 @@ void nr_schedule_pucch(int Mod_idP,
     NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
     if (sched_ctrl->ul_failure==1 && get_softmodem_params()->phy_test==0) continue;
     const int n = sizeof(sched_ctrl->sched_pucch) / sizeof(*sched_ctrl->sched_pucch);
-    LOG_D(NR_MAC,"[yjn]frameP = %d,slotP = %d, n = %d\n",frameP,slotP,n);
     for (int i = 0; i < n; i++) {
       NR_sched_pucch_t *curr_pucch = &UE_info->UE_sched_ctrl[UE_id].sched_pucch[i];
       const uint16_t O_ack = curr_pucch->dai_c;
       const uint16_t O_csi = curr_pucch->csi_bits;
       const uint8_t O_sr = curr_pucch->sr_flag;
-      LOG_D(NR_MAC,"[yjn]curr_pucch->frame = %d,curr_pucch->ul_slot = %d, i = %d,O_ack =%d,O_csi = %d,O_sr=%d\n",curr_pucch->frame,curr_pucch->ul_slot,i,curr_pucch->dai_c,curr_pucch->csi_bits,curr_pucch->sr_flag);
       if (O_ack + O_csi + O_sr == 0
           || frameP != curr_pucch->frame
           || slotP != curr_pucch->ul_slot)
@@ -536,8 +527,7 @@ void nr_csi_meas_reporting(int Mod_idP,
       int bwp_start = NRRIV2PRBOFFSET(genericParameters->locationAndBandwidth,MAX_BWP_SIZE);
 
       // going through the list of PUCCH resources to find the one indexed by resource_id
-      int future_ind = get_future_ul_tti_req_ind(frame, sched_slot);  //add_yjn
-      uint16_t *vrb_map_UL = &RC.nrmac[Mod_idP]->common_channels[0].vrb_map_UL[future_ind * MAX_BWP_SIZE];//add_yjn
+      uint16_t *vrb_map_UL = &RC.nrmac[Mod_idP]->common_channels[0].vrb_map_UL[sched_slot * MAX_BWP_SIZE];
       const int m = pucch_Config->resourceToAddModList->list.count;
       for (int j = 0; j < m; j++) {
         NR_PUCCH_Resource_t *pucchres = pucch_Config->resourceToAddModList->list.array[j];
@@ -1056,7 +1046,7 @@ static NR_UE_harq_t *find_harq(module_id_t mod_id, frame_t frame, sub_frame_t sl
     return NULL;
   NR_UE_harq_t *harq = &sched_ctrl->harq_processes[pid];
   /* old feedbacks we missed: mark for retransmission */
-  while ((harq->feedback_frame)%1024 != frame //add_yjn_sec
+  while (harq->feedback_frame != frame
          || (harq->feedback_frame == frame && harq->feedback_slot < slot)) {
     LOG_W(NR_MAC,
           "expected HARQ pid %d feedback at %d.%d, but is at %d.%d instead (HARQ feedback is in the past)\n",
@@ -1100,7 +1090,6 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
   NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
 
   if (((uci_01->pduBitmap >> 1) & 0x01)) {
-    //LOG_I(NR_MAC, "[yjn]:location,harq = find_harq \n");
     // iterate over received harq bits
     for (int harq_bit = 0; harq_bit < uci_01->harq->num_harq; harq_bit++) {
       const uint8_t harq_value = uci_01->harq->harq_list[harq_bit].harq_value;
@@ -1122,7 +1111,6 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
   // check scheduling request result, confidence_level == 0 is good
   if (uci_01->pduBitmap & 0x1 && uci_01->sr->sr_indication && uci_01->sr->sr_confidence_level == 0 && uci_01->ul_cqi >= 148) {
     // SR detected with SNR >= 10dB
-    //LOG_I(NR_MAC, "[yjn]:location,sched_ctrl->SR |= true; \n");
     sched_ctrl->SR |= true;
     LOG_D(NR_MAC, "SR UE %04x ul_cqi %d\n", uci_01->rnti, uci_01->ul_cqi);
   }
@@ -1130,12 +1118,10 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
   // tpc (power control) only if we received AckNack or positive SR. For a
   // negative SR, the UE won't have sent anything, and the SNR is not valid
   if (((uci_01->pduBitmap >> 1) & 0x1) || sched_ctrl->SR) {
-     //LOG_I(NR_MAC, "[yjn]:location,tpc\n");
     if ((uci_01->harq) && (uci_01->harq->harq_confidence_level==0)) sched_ctrl->tpc1 = nr_get_tpc(RC.nrmac[mod_id]->pucch_target_snrx10, uci_01->ul_cqi, 30);
     else                                        sched_ctrl->tpc1 = 3;
     sched_ctrl->pucch_snrx10 = uci_01->ul_cqi * 5 - 640;
   }
-  //LOG_I(NR_MAC, "[yjn]:location,none\n");
 }
 
 void handle_nr_uci_pucch_2_3_4(module_id_t mod_id,
@@ -1439,9 +1425,8 @@ int nr_acknack_scheduling(int mod_id,
     DevAssert(resource->format.present == NR_PUCCH_Resource__format_PR_format0);
     int second_hop_prb = resource->secondHopPRB!= NULL ?  *resource->secondHopPRB : 0;
     int nr_of_symbols = resource->format.choice.format0->nrofSymbols;
-    int future_ind = get_future_ul_tti_req_ind(pucch->frame, pucch->ul_slot);//add_yjn
     if (resource->format.choice.format0->initialCyclicShift == 0) {
-      uint16_t *vrb_map_UL = &RC.nrmac[mod_id]->common_channels[CC_id].vrb_map_UL[future_ind * MAX_BWP_SIZE];//add_yjn
+      uint16_t *vrb_map_UL = &RC.nrmac[mod_id]->common_channels[CC_id].vrb_map_UL[pucch->ul_slot * MAX_BWP_SIZE];
       for (int l=0; l<nr_of_symbols; l++) {
         uint16_t symb = 1 << (resource->format.choice.format0->startingSymbolIndex + l);
         int prb;
@@ -1521,8 +1506,7 @@ void nr_sr_reporting(int Mod_idP, frame_t SFN, sub_frame_t slot)
       NR_PUCCH_Resource_t *pucch_res = pucch_Config->resourceToAddModList->list.array[found];
       /* for the moment, can only handle SR on PUCCH Format 0 */
       DevAssert(pucch_res->format.present == NR_PUCCH_Resource__format_PR_format0);
-      int future_index = get_future_ul_tti_req_ind(SFN + 1, slot); //add_yjn_test
-      nfapi_nr_ul_tti_request_t *ul_tti_req = &nrmac->UL_tti_req_ahead[0][future_index];//add_yjn;
+      nfapi_nr_ul_tti_request_t *ul_tti_req = &nrmac->UL_tti_req_ahead[0][slot];
       bool nfapi_allocated = false;
       for (int i = 0; i < ul_tti_req->n_pdus; ++i) {
         if (ul_tti_req->pdus_list[i].pdu_type != NFAPI_NR_UL_CONFIG_PUCCH_PDU_TYPE)
@@ -1553,7 +1537,6 @@ void nr_sr_reporting(int Mod_idP, frame_t SFN, sub_frame_t slot)
           continue;
         }
         curr_pucch->sr_flag = true;
-        LOG_D(NR_MAC,"current PUCCH is for the current slot, in which case we add the SR to it\n");
       } else {
         NR_sched_pucch_t sched_sr;
         memset(&sched_sr, 0, sizeof(sched_sr));
@@ -1562,7 +1545,6 @@ void nr_sr_reporting(int Mod_idP, frame_t SFN, sub_frame_t slot)
         sched_sr.resource_indicator = found;
         sched_sr.sr_flag = true;
         nr_fill_nfapi_pucch(Mod_idP, SFN, slot, &sched_sr, UE_id);
-        LOG_D(NR_MAC,"current PUCCH is  not for the current slot, in which case we add the SR to it\n");
       }
     }
   }

@@ -101,7 +101,7 @@ static void NRRCconfig_RU(void);
 uint16_t sf_ahead;
 uint16_t slot_ahead;
 uint16_t sl_ahead;
-extern int num_delay;//add_yjn_sec
+
 extern int emulate_rf;
 extern int numerology;
 

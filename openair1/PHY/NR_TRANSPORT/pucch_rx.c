@@ -99,6 +99,7 @@ void nr_fill_pucch(PHY_VARS_gNB *gNB,
   pucch->frame = frame;
   pucch->slot = slot;
   pucch->active = 1;
+  LOG_D(PHY,"[yjn]: id = %d,pucch->frame =  %d, pucch->slot = %d, pucch->active = %d,pucch_pdu->sr_flag = %d,pucch_pdu->bit_len_harq = %d\n",id, pucch->frame,pucch->slot,pucch->active,pucch_pdu->sr_flag,pucch_pdu->bit_len_harq);
   memcpy((void*)&pucch->pucch_pdu, (void*)pucch_pdu, sizeof(nfapi_nr_pucch_pdu_t));
 }
 
@@ -182,6 +183,7 @@ void nr_decode_pucch0(PHY_VARS_gNB *gNB,
 	      "Either bit_len_harq (%d) or sr_flag (%d) must be > 0\n",
 	      pucch_pdu->bit_len_harq,pucch_pdu->sr_flag);
 
+  LOG_D(PHY, "[yjn]:pucch_pdu->bit_len_harq = %d,pucch_pdu->sr_flag = %d\n",pucch_pdu->bit_len_harq,pucch_pdu->sr_flag);
   NR_gNB_UCI_STATS_t *uci_stats=NULL;
   NR_gNB_UCI_STATS_t *first_uci_stats=NULL;
   for (int i=0;i<NUMBER_OF_NR_UCI_STATS_MAX;i++)

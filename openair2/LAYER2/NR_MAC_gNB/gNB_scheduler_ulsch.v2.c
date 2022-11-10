@@ -36,10 +36,6 @@
 #include <openair2/UTIL/OPT/opt.h>
 
 #include "LAYER2/NR_MAC_COMMON/nr_mac_extern.h"
-extern uint16_t sl_ahead;
-extern int num_delay;//add_yjn
-
-int get_future_ul_tti_req_ind(frame_t frame, sub_frame_t slot);//add_yjn
 
 int get_dci_format(NR_UE_sched_ctrl_t *sched_ctrl) {
 
@@ -635,9 +631,7 @@ void nr_rx_sdu(const module_id_t gnb_mod_idP,
 
   gNB_MAC_INST *gNB_mac = RC.nrmac[gnb_mod_idP];
   NR_UE_info_t *UE_info = &gNB_mac->UE_info;
-  NR_COMMON_channels_t *cc = gNB_mac->common_channels;  //add_yjn
-  NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon; //add_yjn
-  const int mu = scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing; //add_yjn
+
   const int current_rnti = rntiP;
   const int UE_id = find_nr_UE_id(gnb_mod_idP, current_rnti);
   const int target_snrx10 = gNB_mac->pusch_target_snrx10;
@@ -828,7 +822,7 @@ void nr_rx_sdu(const module_id_t gnb_mod_idP,
 
           if (nr_process_mac_pdu(gnb_mod_idP, UE_id, CC_idP, frameP, slotP, sduP, sdu_lenP) == 0) {
             ra->state = Msg4;
-             ra->Msg4_frame = (frameP + (sl_ahead + num_delay)/nr_slots_per_frame[mu] + 1) % 1024; //add_yjn   ra->Msg4_frame = (frameP + 2) % 1024;没道理
+            ra->Msg4_frame = (frameP + 2) % 1024;
             ra->Msg4_slot = 1;
             
             if (ra->msg3_dcch_dtch) {
@@ -1314,8 +1308,8 @@ bool nr_fr1_ulsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t
   if (tda < 0)
     return false;
   int K2 = get_K2(scc, sched_ctrl->active_ubwp, tda, mu);
-  const int sched_frame = (frame + (slot + K2 + num_delay) / nr_slots_per_frame[mu]) % 1024;  //add_yjn   const int sched_frame = frame + (slot + K2 >= nr_slots_per_frame[mu]);
-  const int sched_slot = (slot + K2 + num_delay) % nr_slots_per_frame[mu];//add_yjn   const int sched_slot = (slot + K2) % nr_slots_per_frame[mu];
+  const int sched_frame = frame + (slot + K2 >= nr_slots_per_frame[mu]);
+  const int sched_slot = (slot + K2) % nr_slots_per_frame[mu];
 
   if (!is_xlsch_in_slot(nr_mac->ulsch_slot_bitmap[sched_slot / 64], sched_slot))
     return false;
@@ -1340,9 +1334,8 @@ bool nr_fr1_ulsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t
   /* Change vrb_map_UL to rballoc_mask: check which symbols per RB (in
    * vrb_map_UL) overlap with the "default" tda and exclude those RBs.
    * Calculate largest contiguous RBs */
-  int future_ind = get_future_ul_tti_req_ind(sched_frame, sched_slot);//add_yjn
   uint16_t *vrb_map_UL =
-      &RC.nrmac[module_id]->common_channels[CC_id].vrb_map_UL[future_ind * MAX_BWP_SIZE];//add_yjn   &RC.nrmac[module_id]->common_channels[CC_id].vrb_map_UL[sched_slot * MAX_BWP_SIZE];
+      &RC.nrmac[module_id]->common_channels[CC_id].vrb_map_UL[sched_slot * MAX_BWP_SIZE];
   const uint16_t bwpSize = NRRIV2BW(sched_ctrl->active_ubwp ?
                                     sched_ctrl->active_ubwp->bwp_Common->genericParameters.locationAndBandwidth:
                                     scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.locationAndBandwidth,
@@ -1553,9 +1546,8 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot)
 
 
     /* PUSCH in a later slot, but corresponding DCI now! */
-    int future_index = get_future_ul_tti_req_ind(sched_pusch->frame, sched_pusch->slot);//add_yjn
-    nfapi_nr_ul_tti_request_t *future_ul_tti_req = &RC.nrmac[module_id]->UL_tti_req_ahead[0][future_index]; //add_yjn   nfapi_nr_ul_tti_request_t *future_ul_tti_req = &RC.nrmac[module_id]->UL_tti_req_ahead[0][sched_pusch->slot];
-    AssertFatal(future_ul_tti_req->SFN == sched_pusch->frame  //add_yjn_sec   AssertFatal(future_ul_tti_req->SFN == sched_pusch->frame
+    nfapi_nr_ul_tti_request_t *future_ul_tti_req = &RC.nrmac[module_id]->UL_tti_req_ahead[0][sched_pusch->slot];
+    AssertFatal(future_ul_tti_req->SFN == sched_pusch->frame
                 && future_ul_tti_req->Slot == sched_pusch->slot,
                 "%d.%d future UL_tti_req's frame.slot %d.%d does not match PUSCH %d.%d\n",
                 frame, slot,

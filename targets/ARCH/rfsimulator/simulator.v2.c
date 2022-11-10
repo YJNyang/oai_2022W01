@@ -85,9 +85,7 @@
     {"ploss",                  "<channel path loss in dB>\n",         simOpt,  dblptr:&(rfsimulator->chan_pathloss),   defdblval:0,                     TYPE_DOUBLE,    0 },\
     {"forgetfact",             "<channel forget factor ((0 to 1)>\n", simOpt,  dblptr:&(rfsimulator->chan_forgetfact), defdblval:0,                     TYPE_DOUBLE,    0 },\
     {"offset",                 "<channel offset in samps>\n",         simOpt,  iptr:&(rfsimulator->chan_offset),       defintval:0,                     TYPE_INT,       0 }\
-  };//add_yjn
-#define NUM_DELAY 10    
-
+  };
 
 
 
@@ -594,7 +592,7 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
           LOG_E(HW,"UEsock: %d Tx/Rx shift too large Tx:%lu, Rx:%lu\n", fd, t->lastWroteTS, b->lastReceivedTS);
 
         pthread_mutex_unlock(&Sockmutex);
-        b->transferPtr=(char *)&b->circularBuf[((b->lastReceivedTS+NUM_DELAY*30720)*b->th.nbAnt)%CirSize];  //add_yjn
+        b->transferPtr=(char *)&b->circularBuf[(b->lastReceivedTS*b->th.nbAnt)%CirSize];
         b->remainToTransfer=sampleToByte(b->th.size, b->th.nbAnt);
       }
 

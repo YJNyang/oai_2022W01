@@ -424,7 +424,6 @@ void config_common(int Mod_idP, int ssb_SubcarrierOffset, int pdsch_AntennaPorts
 }
 
 extern uint16_t sl_ahead;
-extern int num_delay;  //add_yjn_sec
 int rrc_mac_config_req_gNB(module_id_t Mod_idP,
                            int ssb_SubcarrierOffset,
                            int pdsch_AntennaPorts,
@@ -441,7 +440,7 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
 
     /* dimension UL_tti_req_ahead for number of slots in frame */
     const uint8_t slots_per_frame[5] = {10, 20, 40, 80, 160};
-    const int n = slots_per_frame[*scc->ssbSubcarrierSpacing] + num_delay; //add_yjn_sec
+    const int n = slots_per_frame[*scc->ssbSubcarrierSpacing];
     RC.nrmac[Mod_idP]->UL_tti_req_ahead[0] = calloc(n, sizeof(nfapi_nr_ul_tti_request_t));
     AssertFatal(RC.nrmac[Mod_idP]->UL_tti_req_ahead[0],
                 "could not allocate memory for RC.nrmac[]->UL_tti_req_ahead[]\n");
@@ -455,7 +454,7 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
        * it for information purposes here (the fix would always put 0, what
        * happens now, too) */
       req->SFN = i < sl_ahead;
-      req->Slot = i % slots_per_frame[*scc->ssbSubcarrierSpacing];//add_yjn  
+      req->Slot = i;
     }
 
     RC.nrmac[Mod_idP]->common_channels[0].vrb_map_UL =
@@ -501,7 +500,7 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
       /* FIXME: it seems there is a problem with slot 0/10/slots right after UL:
        * we just get retransmissions. Thus, do not schedule such slots in DL */
       if (slot % nr_slots_period != 0)
-        RC.nrmac[Mod_idP]->dlsch_slot_bitmap[slot / 64] |= (uint64_t)((slot % nr_slots_period) < nr_dlmix_slots-1) << (slot % 64);  //add_yjn_first //这里纯下行时隙
+        RC.nrmac[Mod_idP]->dlsch_slot_bitmap[slot / 64] |= (uint64_t)((slot % nr_slots_period) < nr_dlmix_slots) << (slot % 64);
       RC.nrmac[Mod_idP]->ulsch_slot_bitmap[slot / 64] |= (uint64_t)((slot % nr_slots_period) >= nr_ulstart_slot) << (slot % 64);
       LOG_D(NR_MAC, "slot %d DL %d UL %d\n",
             slot,

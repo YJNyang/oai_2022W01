@@ -961,11 +961,12 @@ void nr_schedule_ue_spec(module_id_t module_id,
     DevAssert(!harq->is_waiting);
     add_tail_nr_list(&sched_ctrl->feedback_dl_harq, current_harq_pid);
     NR_sched_pucch_t *pucch = &sched_ctrl->sched_pucch[sched_pdsch->pucch_allocation];
-    harq->feedback_frame = pucch->frame;
+    harq->feedback_frame = (pucch->frame + 1)%1024;//add_yjn_test
     harq->feedback_slot = pucch->ul_slot;
     harq->is_waiting = true;
     UE_info->mac_stats[UE_id].dlsch_rounds[harq->round]++;
 
+    LOG_D(NR_MAC,"harq->feedback_frame = %d,harq->feedback_slot = %d,dai_c = %d\n",harq->feedback_frame,harq->feedback_slot,pucch->dai_c);
     LOG_D(NR_MAC,
           "%4d.%2d [DLSCH/PDSCH/PUCCH] UE %d RNTI %04x DCI L %d start %3d RBs %3d startSymbol %2d nb_symbol %2d dmrspos %x MCS %2d TBS %4d HARQ PID %2d round %d RV %d NDI %d dl_data_to_ULACK %d (%d.%d) PUCCH allocation %d TPC %d\n",
           frame,
@@ -1354,5 +1355,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
 
     /* mark UE as scheduled */
     sched_pdsch->rbSize = 0;
+
+    LOG_D(NR_MAC,"[yjn]pucch->frame = %d,pucch->ul_slot = %d,pucch->dai_c = %d\n",pucch->frame,pucch->ul_slot,pucch->dai_c);
   }
 }

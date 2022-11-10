@@ -56,7 +56,6 @@
 #include <executables/softmodem-common.h>
 
 #include "LAYER2/NR_MAC_COMMON/nr_mac_extern.h"
-extern int slot_delay;//add_yjn
 
 static prach_association_pattern_t prach_assoc_pattern;
 static ssb_list_info_t ssb_list;
@@ -1418,7 +1417,11 @@ int nr_ue_pusch_scheduler(NR_UE_MAC_INST_t *mac,
                 k2+delta,DURATION_RX_TO_TX);
 
     *slot_tx = (current_slot + k2 + delta) % nr_slots_per_frame[mu];
-    *frame_tx = (current_frame + (current_slot + k2 + delta) / nr_slots_per_frame[mu]) % 1024;  //add_yjn 与改之前基本一致（原版本应该有bug）
+    if (current_slot + k2 + delta > nr_slots_per_frame[mu]){
+      *frame_tx = (current_frame + 1) % 1024;
+    } else {
+      *frame_tx = current_frame;
+    }
 
   } else {
 
@@ -1431,7 +1434,7 @@ int nr_ue_pusch_scheduler(NR_UE_MAC_INST_t *mac,
 
     // Calculate TX slot and frame
     *slot_tx = (current_slot + k2) % nr_slots_per_frame[mu];
-    *frame_tx = (current_frame + (current_slot + k2) / nr_slots_per_frame[mu]) % 1024;//add_yjn   与改之前一致
+    *frame_tx = ((current_slot + k2) > nr_slots_per_frame[mu]) ? (current_frame + 1) % 1024 : current_frame;
 
   }
 
@@ -2013,18 +2016,16 @@ static int get_nr_prach_info_from_ssb_index(uint8_t ssb_idx,
   //      - exact slot number
   //      - frame offset
   ssb_info_p = &ssb_list.tx_ssb[ssb_idx];
-  int prach_slot = (slot + 2*slot_delay) % 20;  //add_yjn
-  int prach_frame = (frame + (slot + 2*slot_delay) / 20) % 1024;//add_yjn
   LOG_D(NR_MAC,"checking for prach : ssb_info_p->nb_mapped_ro %d\n",ssb_info_p->nb_mapped_ro);
   for (uint8_t n_mapped_ro=0; n_mapped_ro<ssb_info_p->nb_mapped_ro; n_mapped_ro++) {
     LOG_D(NR_MAC,"%d.%d: mapped_ro[%d]->frame.slot %d.%d, prach_assoc_pattern.nb_of_frame %d\n",
           frame,slot,n_mapped_ro,ssb_info_p->mapped_ro[n_mapped_ro]->frame,ssb_info_p->mapped_ro[n_mapped_ro]->slot,prach_assoc_pattern.nb_of_frame);
-    if ((prach_slot == ssb_info_p->mapped_ro[n_mapped_ro]->slot) &&   //add_yjn
-        (ssb_info_p->mapped_ro[n_mapped_ro]->frame == (prach_frame % prach_assoc_pattern.nb_of_frame))) {  //add_yjn
+    if ((slot == ssb_info_p->mapped_ro[n_mapped_ro]->slot) &&
+        (ssb_info_p->mapped_ro[n_mapped_ro]->frame == (frame % prach_assoc_pattern.nb_of_frame))) {
 
       uint8_t prach_config_period_nb = ssb_info_p->mapped_ro[n_mapped_ro]->frame / prach_assoc_pattern.prach_conf_period_list[0].nb_of_frame;
       uint8_t frame_nb_in_prach_config_period = ssb_info_p->mapped_ro[n_mapped_ro]->frame % prach_assoc_pattern.prach_conf_period_list[0].nb_of_frame;
-      prach_occasion_slot_p = &prach_assoc_pattern.prach_conf_period_list[prach_config_period_nb].prach_occasion_slot_map[frame_nb_in_prach_config_period][prach_slot];  //add_yjn
+      prach_occasion_slot_p = &prach_assoc_pattern.prach_conf_period_list[prach_config_period_nb].prach_occasion_slot_map[frame_nb_in_prach_config_period][slot];
     }
   }
 
