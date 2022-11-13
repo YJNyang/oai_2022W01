@@ -59,6 +59,7 @@ extern openair0_config_t openair0_cfg[];
 int cnt=0;
 
 #define DEBUG_INITIAL_SYNCH
+#define DBG_FO_COMPENSATE_NR
 
 //rxdata is single antennas_rx;   start:samples start
 void fre_offset_compensation_simd(int32_t* rxdata, int start, int end, double off_angle) {
@@ -294,6 +295,11 @@ int nr_initial_sync(UE_nr_rxtx_proc_t *proc,
     LOG_I(PHY,"sync_pos %d ssb_offset %d \n",sync_pos,ue->ssb_offset);
 #endif
 
+#ifdef DBG_FO_COMPENSATE_NR
+
+  LOG_M("beforecompen.m","rxd_before", &ue->common_vars.rxdata[0][0], 2*fp->samples_per_frame, 1, 1);
+
+#endif
     // digital compensation of FFO for SSB symbols
     if (ue->UE_fo_compensation){  
         double s_time = 1/(1.0e3*fp->samples_per_subframe);  // sampling time
@@ -311,6 +317,11 @@ int nr_initial_sync(UE_nr_rxtx_proc_t *proc,
           fre_offset_compensation_simd(ue->common_vars.rxdata[ar],start,end,off_angle);
     }
 
+#ifdef DBG_FO_COMPENSATE_NR
+
+  LOG_M("aftercompen.m","rxd_after", &ue->common_vars.rxdata[0][0], 2*fp->samples_per_frame, 1, 1);
+
+#endif
     /* check that SSS/PBCH block is continuous inside the received buffer */
     if (sync_pos < (NR_NUMBER_OF_SUBFRAMES_PER_FRAME*fp->samples_per_subframe - (NB_SYMBOLS_PBCH * fp->ofdm_symbol_size))) {
 

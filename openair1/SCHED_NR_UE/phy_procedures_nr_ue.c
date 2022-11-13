@@ -2122,7 +2122,6 @@ void UE_TrackSync_thread(void*arg)
     }
       UE->delay_offset = UE->rx_offset - UE->delay_offset;
     
-    // UE->track_sync_fo=44320;
     LOG_I(PHY,"[TRACK SYNC] cfo_track=%d, delay_offset=%d, rx_offset=%d \n",UE->track_sync_fo,UE->delay_offset,UE->rx_offset);
     
     //------------------------------------------ FSM ------------------------------------------//

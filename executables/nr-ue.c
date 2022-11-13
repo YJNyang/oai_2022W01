@@ -135,8 +135,11 @@ int syncUpdateTrack(PHY_VARS_NR_UE *UE, int position, int length)
   if(UE->UE_fo_compensation){
       double s_time = 1/(1.0e3*UE->frame_parms.samples_per_subframe);  // sampling time
       double off_angle = 2*M_PI*s_time*(UE->common_vars.freq_offset);
+      int winStart = position-length/2;
+      int winEnd = winStart + length + 4*UE->frame_parms.ofdm_symbol_size;
       for (int i=0; i<UE->frame_parms.nb_antennas_rx; i++){ // 下行补偿
-          cfo_compensation((int32_t *)&UE->common_vars.rxdata[i][0],0,2*UE->frame_parms.samples_per_frame, off_angle); 
+          cfo_compensation((int32_t *)&UE->common_vars.rxdata[i][winStart],winStart,winEnd, off_angle); 
+          // cfo_compensation((int32_t *)&UE->common_vars.rxdata[i][0],0,2*UE->frame_parms.samples_per_frame, off_angle); 
       }
   }
 
@@ -154,17 +157,6 @@ int syncUpdateTrack(PHY_VARS_NR_UE *UE, int position, int length)
         else
               UE->rx_offset = UE->ssb_offset - UE->sync_pos_frame;
         LOG_W(PHY, "[SYNC FSM] Sync mode switch(init->wait), rx_offset is %d \n",UE->rx_offset);
-        //**  计算频偏补偿序列  **//
-          //  if(UE->UE_fo_compensation){
-          //       double s_time = 1/(1.0e3*UE->frame_parms.samples_per_subframe);  // sampling time
-          //       double off_angle = 2*M_PI*s_time*(UE->track_sync_fo);  // ue->track_sync_fo为跟踪同步时计算得到的频偏（每帧一次）
-          //       int end = UE->frame_parms.samples_per_slot0;
-          //       for(int n=0; n<end; n++){
-          //           UE->common_vars.cfo_compen_sin[n] = sin(n*off_angle);
-          //           UE->common_vars.cfo_compen_cos[n] = cos(n*off_angle);
-          //       }
-          //       LOG_I(PHY,"[SYNC CFO] Update CFO compensation value %f \n",off_angle);
-          //   }
 }else{
            AssertFatal(0,"UPDATE SYNC FAILED\n");
 }
@@ -671,7 +663,7 @@ static void UE_synch(void *arg) {
 
         // rerun with new cell parameters and frequency-offset
         // todo: the freq_offset computed on DL shall be scaled before being applied to UL
-        nr_rf_card_config_freq(&openair0_cfg[UE->rf_map.card], ul_carrier, dl_carrier, freq_offset);
+        // nr_rf_card_config_freq(&openair0_cfg[UE->rf_map.card], ul_carrier, dl_carrier, freq_offset);
 
         LOG_I(PHY,"Got synch: hw_slot_offset %d, carrier off %d Hz, rxgain %f (DL %f Hz, UL %f Hz)\n",
               hw_slot_offset,

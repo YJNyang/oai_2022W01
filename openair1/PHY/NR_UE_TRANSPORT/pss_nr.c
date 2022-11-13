@@ -1145,7 +1145,7 @@ int pss_search_time_nr(int **rxdata, ///rx data in time domain
               ffo_cp_corr = dot_product64((short*)&(rxdata[0][PosStart+i*offsetUnit]), 
                                         (short*)&(rxdata[0][PosStart+i*offsetUnit+frame_parms->ofdm_symbol_size]), // 修改：调用前完成数据截取
                                         frame_parms->nb_prefix_samples,
-                                        pss_corr_shift);
+                                        5);
             re3 += (double) (((int32_t*) &ffo_cp_corr)[0]);
             im3 += (double)(((int32_t*) &ffo_cp_corr)[1]);
           }
@@ -1279,22 +1279,22 @@ int pss_search_time_track_nr(int **rxdata, ///rx data in time domain
    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> CP FFO EST <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<//
     double ffo_cp=0;
     int64_t ffo_cp_corr = 0;
-    double re3=0;
-    double im3=0;
+    int64_t re3=0;
+    int64_t im3=0;
     int offsetUnit = frame_parms->nb_prefix_samples + frame_parms->ofdm_symbol_size;
     int PosStart = peak_position - frame_parms->nb_prefix_samples;  
-    for (int i = -1; i < 3; i++){
+    for (int i = 0; i < 4; i++){
         ffo_cp_corr = dot_product64((short*)&(rxdata[0][PosStart+i*offsetUnit]), 
                                   (short*)&(rxdata[0][PosStart+i*offsetUnit+frame_parms->ofdm_symbol_size]), // 修改：调用前完成数据截取
                                   frame_parms->nb_prefix_samples,
                                   frame_parms->ffo_corr_shift);
-      re3 += (double) (((int32_t*) &ffo_cp_corr)[0]);
-      im3 += (double)(((int32_t*) &ffo_cp_corr)[1]);
+      re3 += (int64_t) (((int32_t*) &ffo_cp_corr)[0]);
+      im3 += (int64_t)(((int32_t*) &ffo_cp_corr)[1]);
     }
     ffo_cp=-atan2(im3,re3)/2/M_PI; // ffo=-angle()/2/pi
-    // LOG_I(PHY,"[UE_SYNC_FFO_CP]  FFO_CP Est res:  ffo_cp=%f  (log2re: %f; log2im: %f)\n",ffo_cp,re3,im3);
+    // LOG_I(PHY,"[UE_SYNC_FFO]  ffo_pss=%f ,ffo_cp=%f\n",ffo_pss,ffo_cp);
 
-    *f_off += ffo_pss*frame_parms->subcarrier_spacing;  
+    *f_off += ffo_cp*frame_parms->subcarrier_spacing;  
     // LOG_I(PHY,"[TRACK SYNC] SNR=%d, sync_pos=%d, ffo_cp=%f, cfo_track=%d \n",trackSNR,peak_position,ffo_pss,*f_off);
 
     return(peak_position);

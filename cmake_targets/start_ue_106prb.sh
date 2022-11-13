@@ -3,7 +3,7 @@
 sudo cp DpssSeq2048.txt dpssSeq.txt
 
 
-sudo ./ran_build/build/nr-uesoftmodem -r 106 --numerology 1 --band 78 -C 3619200000 -s 516 --sa --ue-fo-compensation --nokrnmod 1 -O ~/openairinterface_w25/openairinterface5g/targets/PROJECTS/GENERIC-NR-5GC/CONF/ue_oai.conf --usrp-args "addr=192.168.20.2,clock_source=internal,time_source=internal"   --ue-txgain 35 --ue-rxgain 45 --ue-timing-correction-disable 1  --dlsch-parallel 16 --rfsimu-if-enable 0 --usrp-freq-off -1600 --doppler-shift 0
+sudo ./ran_build/build/nr-uesoftmodem -r 106 --numerology 1 --band 78 -C 3619200000 -s 516 --sa --ue-fo-compensation --nokrnmod 1 -O ~/openairinterface_w25/openairinterface5g/targets/PROJECTS/GENERIC-NR-5GC/CONF/ue_oai.conf --usrp-args "addr=192.168.20.2,clock_source=internal,time_source=internal"   --ue-txgain 35 --ue-rxgain 45 --ue-timing-correction-disable 1  --dlsch-parallel 4 --rfsimu-if-enable 0 --usrp-freq-off -1600 --doppler-shift 17708 --ffo-corr-shift 11
 
 
 # --usrp-freq-off用于手动校正UE usrp Tx/Rx Freq
