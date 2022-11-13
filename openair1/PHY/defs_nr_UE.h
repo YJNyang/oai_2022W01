@@ -1065,7 +1065,16 @@ typedef struct {
 #endif
   
   int dl_stats[5];
+    //++++++++++++++++++++++++++++++++++++++++++++++++ added by zjw ++++++++++++++++++++++++++++++++++++++++++++++++//
+  SYNC_MODE_t SYNC_mode[NUMBER_OF_CONNECTED_gNB_MAX];
 
+  int32_t sync_pos_frame;
+  int32_t initial_sync_pos;
+  int32_t track_sync_fo; 
+  int32_t max_delay_offset;
+  int32_t delay_offset;
+  int32_t SamplesShift_Ready;
+  //================================================ added by zjw ================================================//
 } PHY_VARS_NR_UE;
 
 /* this structure is used to pass both UE phy vars and

@@ -118,6 +118,9 @@ double          rx_gain_off = 0.0;
 char             *usrp_args = NULL;
 char       *rrc_config_path = NULL;
 int               dumpframe = 0;
+int rfsimu_if_flag;
+int32_t       doppler_shift=0;       
+int32_t       usrp_freq_off=0;   
 
 uint64_t        downlink_frequency[MAX_NUM_CCs][4];
 int32_t         uplink_frequency_offset[MAX_NUM_CCs][4];
@@ -248,6 +251,7 @@ void init_tpools(uint8_t nun_dlsch_threads) {
     memcpy(params+(i*3),"-1,",3);
   }
   initTpool(params, &(nrUE_params.Tpool), false);
+  initTpool(params, &(nrUE_params.SyncTpool), false);
   free(params);
   init_dlsch_tpool( nun_dlsch_threads);
 }
@@ -336,9 +340,8 @@ void set_options(int CC_id, PHY_VARS_NR_UE *UE){
 
 }
 
-void init_openair0(void) {
+void init_openair0(int freq_off) {
   int card;
-  int freq_off = 0;
   NR_DL_FRAME_PARMS *frame_parms = &PHY_vars_UE_g[0][0]->frame_parms;
 
   for (card=0; card<MAX_CARDS; card++) {
@@ -368,8 +371,20 @@ void init_openair0(void) {
       duplex_mode[openair0_cfg[card].duplex_mode]);
 
     nr_get_carrier_frequencies(PHY_vars_UE_g[0][0], &dl_carrier, &ul_carrier);
+    if(rfsimu_if_flag){
+          dl_carrier = 2800000000;    
+          ul_carrier = 2800000000;   
+    }
 
-    nr_rf_card_config_freq(&openair0_cfg[card], ul_carrier, dl_carrier, freq_off);
+    nr_rf_card_config_freq(&openair0_cfg[card], ul_carrier, dl_carrier, freq_off);  // 手动对齐gNB和nrUE频点,在默认条件下使初始同步频偏估计结果为0
+    if(freq_off  != 0){
+      dl_carrier = dl_carrier+freq_off;
+      ul_carrier = ul_carrier+freq_off;
+    }
+
+    if(doppler_shift != 0) // UE加doppler频偏(上下行经历相同频偏). 在UE侧 Rx Freq += doppler_shift, Tx Freq -=doppler_shift;
+      nr_rf_card_config_freq_doppler(&openair0_cfg[card], ul_carrier, dl_carrier, doppler_shift);
+
     nr_rf_card_config_gain(&openair0_cfg[card], rx_gain_off);
 
     openair0_cfg[card].configFilename = get_softmodem_params()->rf_config_file;
@@ -518,7 +533,7 @@ int main( int argc, char **argv ) {
       init_nr_ue_vars(UE[CC_id], 0, abstraction_flag);
     }
 
-    init_openair0();
+    init_openair0(usrp_freq_off);
     // init UE_PF_PO and mutex lock
     pthread_mutex_init(&ue_pf_po_mutex, NULL);
     memset (&UE_PF_PO[0][0], 0, sizeof(UE_PF_PO_t)*NUMBER_OF_UE_MAX*MAX_NUM_CCs);

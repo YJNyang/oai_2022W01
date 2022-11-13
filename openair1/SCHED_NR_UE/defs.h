@@ -438,6 +438,6 @@ int nr_ue_pdcch_procedures(uint8_t gNB_id,
 			   UE_nr_rxtx_proc_t *proc,
                            int n_ss);
 
-
+void UE_TrackSync_thread(void*arg);
 #endif
 

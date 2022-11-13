@@ -1405,10 +1405,11 @@ double sinr_eff_cqi_calc(PHY_VARS_NR_UE *phy_vars_ue,
 
 uint8_t sinr2cqi(double sinr,uint8_t trans_mode);
 
-
 int dump_ue_stats(PHY_VARS_NR_UE *phy_vars_ue, UE_nr_rxtx_proc_t *proc, char* buffer, int length, runmode_t mode, int input_level_dBm);
 
 void init_transport_channels(uint8_t);
+
+void fre_offset_compensation_simd(int32_t* rxdata, int start, int end, double off_angle);
 
 void generate_RIV_tables(void);
 
@@ -1426,6 +1427,8 @@ int nr_initial_sync(UE_nr_rxtx_proc_t *proc,
                     int sa,
                     int dlsch_parallel);
 
+int nr_track_sync(PHY_VARS_NR_UE *ue,
+                    int position,int length, int predict_flag);
 /*!
   \brief This function gets the carrier frequencies either from FP or command-line-set global variables, depending on the availability of the latter
   @param fp         Pointer to frame params
@@ -1447,6 +1450,11 @@ void nr_get_carrier_frequencies(PHY_VARS_NR_UE *ue,
 */
 void nr_rf_card_config_gain(openair0_config_t *openair0_cfg,
                             double rx_gain_off);
+
+void nr_rf_card_config_freq_doppler(openair0_config_t *openair0_cfg,
+                            uint64_t ul_Carrier,
+                            uint64_t dl_Carrier,
+                            int freq_offset);
 
 void nr_rf_card_config_freq(openair0_config_t *openair0_cfg,
                             uint64_t ul_Carrier,

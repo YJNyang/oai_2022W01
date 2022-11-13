@@ -90,19 +90,27 @@
 #define NUM_DELAY 10  //add_yjn
 
 typedef struct complex16 sample_t; // 2*16 bits complex number
-
+#include<stdio.h>
+#include<immintrin.h>
+#include<stdint.h>
+#include<math.h>
+#include<stdlib.h>
+#include<time.h>
 //add_yjn
-static void fre_offset_compensation_simd(int32_t* rxdata, int start, int end, double off_angle) {
+//rxdata is single antennas_rx;   start:stamples start
+static void fre_offset_compensation_simd(int32_t* rxdata, int64_t start, int64_t end, double off_angle) {
+    // LOG_W(HW, "Place 1\n");
     int nb_samples_within_simd = 8;
     float phase_re = (float)cos(nb_samples_within_simd * off_angle);
     float phase_im = (float)sin(nb_samples_within_simd * off_angle);
+    // LOG_W(HW, "Place 2\n");
     __m256 base_phase_re = _mm256_set1_ps(phase_re);
     __m256 base_phase_im = _mm256_set1_ps(phase_im);
     __m256 real_phase_re = _mm256_setr_ps(cos(start * off_angle), cos((start + 1) * off_angle), cos((start + 2) * off_angle), cos((start + 3) * off_angle),
         cos((start + 4) * off_angle), cos((start + 5) * off_angle), cos((start + 6) * off_angle), cos((start + 7) * off_angle));
     __m256 real_phase_im = _mm256_setr_ps(sin(start * off_angle), sin((start + 1) * off_angle), sin((start + 2) * off_angle), sin((start + 3) * off_angle),
         sin((start + 4) * off_angle), sin((start + 5) * off_angle), sin((start + 6) * off_angle), sin((start + 7) * off_angle));
-
+    // LOG_W(HW, "Place 3\n");
     __m256 real_phase_re_tem;
     __m256 real_phase_im_tem;
     for (int n = start; n < end; n += 8) {
@@ -115,15 +123,17 @@ static void fre_offset_compensation_simd(int32_t* rxdata, int start, int end, do
                                               (float)(((short*)rxdata))[2 * n + 5], (float)(((short*)rxdata))[2 * n + 7],
                                               (float)(((short*)rxdata))[2 * n + 9], (float)(((short*)rxdata))[2 * n + 11],
                                               (float)(((short*)rxdata))[2 * n + 13], (float)(((short*)rxdata))[2 * n + 15]);
-
+      // LOG_W(HW, "Place 4\n");
         __m256 data_re = _mm256_fmsub_ps(rx_re, real_phase_re, _mm256_mul_ps(rx_im, real_phase_im)); 
         __m256 data_im = _mm256_fmadd_ps(rx_im, real_phase_re, _mm256_mul_ps(rx_re, real_phase_im)); 
-
+      // LOG_W(HW, "Place 5\n");
         __m256i data_re_int = _mm256_cvtps_epi32(data_re);
         __m256i data_im_int = _mm256_cvtps_epi32(data_im);
         __m256i data = _mm256_blend_epi16(data_re_int, _mm256_slli_epi32(data_im_int, 16), 0b10101010);
-        _mm256_store_si256((__m256i*)(rxdata+start) + (n - start) / 8, data);
-
+        // LOG_W(HW, "Place 6\n");
+        // LOG_W(HW, "Store address is %p\n",(__m256i*)(rxdata) + (n - start) / 8);
+        _mm256_store_si256((__m256i*)(rxdata) + (n - start) / 8, data);
+        // LOG_W(HW, "Place 7\n");
         real_phase_re_tem = real_phase_re;
         real_phase_im_tem = real_phase_im;
         real_phase_re = _mm256_fmsub_ps(real_phase_re_tem, base_phase_re, _mm256_mul_ps(real_phase_im_tem, base_phase_im));
@@ -131,28 +141,37 @@ static void fre_offset_compensation_simd(int32_t* rxdata, int start, int end, do
 
     }
 }
-
 static void cfo_compensation(int32_t* rxdata, int64_t start, int64_t end, double off_angle){
+  LOG_I(HW,"Add cfo_compensation Place 0\n");   
   double re,im;
   int BlockSize = end - start;
   int alignedstart = 8-(start%8);
   int alignedend = BlockSize-(end%8);
-  
-  for(int n=start; n<start+alignedstart; n++){
+  LOG_I(HW,"start = %ld, end = %ld\n",start,end);     
+  LOG_I(HW,"BlockSize = %d, alignedstart = %d,  alignedend = %d\n",BlockSize,alignedstart,alignedend);     
+  LOG_I(HW,"Add cfo_compensation Place 1\n");     
+  for(int n=0; n<alignedstart; n++){
     re = ((double)(((short *)rxdata))[2*n]);
     im = ((double)(((short *)rxdata))[2*n+1]);
     ((short *)rxdata)[2*n] = (short)(round(re*cos(n*off_angle) - im*sin(n*off_angle)));
     ((short *)rxdata)[2*n+1] = (short)(round(re*sin(n*off_angle) + im*cos(n*off_angle)));
   }
-
-  fre_offset_compensation_simd(rxdata,start+alignedstart,start+alignedend,off_angle);
-
-  for(int n=start+alignedend; n<start+BlockSize; n++){
+  LOG_I(HW,"Add cfo_compensation Place 2\n");     
+  fre_offset_compensation_simd(rxdata,alignedstart,alignedend,off_angle);
+  // for(int n=alignedstart; n<alignedend; n++){
+  //   re = ((double)(((short *)rxdata))[2*n]);
+  //   im = ((double)(((short *)rxdata))[2*n+1]);
+  //   ((short *)rxdata)[2*n] = (short)(round(re*cos(n*off_angle) - im*sin(n*off_angle)));
+  //   ((short *)rxdata)[2*n+1] = (short)(round(re*sin(n*off_angle) + im*cos(n*off_angle)));
+  // }
+LOG_I(HW,"Add cfo_compensation Place 3\n");     
+  for(int n=alignedend; n<BlockSize; n++){
       re = ((double)(((short *)rxdata))[2*n]);
       im = ((double)(((short *)rxdata))[2*n+1]);
       ((short *)rxdata)[2*n] = (short)(round(re*cos(n*off_angle) - im*sin(n*off_angle)));
       ((short *)rxdata)[2*n+1] = (short)(round(re*sin(n*off_angle) + im*cos(n*off_angle)));
   } 
+  LOG_I(HW,"Add cfo_compensation Place 4\n");     
   return;
 }
 
@@ -203,10 +222,10 @@ typedef struct {
   poll_telnetcmdq_func_t poll_telnetcmdq;
 } rfsimulator_state_t;
 
-
+// (void*) memalign(32, size+32);
 static void allocCirBuf(rfsimulator_state_t *bridge, int sock) {
   buffer_t *ptr=&bridge->buf[sock];
-  AssertFatal ( (ptr->circularBuf=(sample_t *) memalign(32, sampleToByte(CirSize,1))) != NULL, "");
+  AssertFatal ( (ptr->circularBuf=(sample_t *) memalign(32,sampleToByte(CirSize,1))) != NULL, "");
   ptr->circularBufEnd=((char *)ptr->circularBuf)+sampleToByte(CirSize,1);
   ptr->conn_sock=sock;
   ptr->lastReceivedTS=0;
@@ -541,6 +560,7 @@ static int rfsimulator_write(openair0_device *device, openair0_timestamp timesta
 static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initial) {
   // Process all incoming events on sockets
   // store the data in lists
+  LOG_I(HW,"flushInput start\n");
   struct epoll_event events[FD_SETSIZE]= {{0}};
   int nfds = epoll_wait(t->epollfd, events, FD_SETSIZE, timeout);
 
@@ -555,6 +575,7 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
     int fd=events[nbEv].data.fd;
 
     if (events[nbEv].events & EPOLLIN && fd == t->listen_sock) {
+      LOG_I(HW,"flushInput place 1\n");
       int conn_sock;
       AssertFatal( (conn_sock = accept(t->listen_sock,NULL,NULL)) != -1, "");
       setblocking(conn_sock, notBlocking);
@@ -562,14 +583,18 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
       LOG_I(HW,"A client connected, sending the current time\n");
       struct complex16 v= {0};
       void *samplesVoid[t->tx_num_channels];
-
+      LOG_I(HW,"flushInput place 2\n");
       for ( int i=0; i < t->tx_num_channels; i++)
         samplesVoid[i]=(void *)&v;
 
       rfsimulator_write_internal(t, t->lastWroteTS > 1 ? t->lastWroteTS-1 : 0,
                                  samplesVoid, 1,
                                  t->tx_num_channels, 1, false);
+      
+      LOG_I(HW,"flushInput place 3\n");
+                                 
     } else {
+      LOG_I(HW,"flushInput place 4\n");
       if ( events[nbEv].events & (EPOLLHUP | EPOLLERR | EPOLLRDHUP) ) {
         socketError(t,fd);
         continue;
@@ -590,7 +615,7 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
         blockSz= b->transferPtr + b->remainToTransfer <= b->circularBufEnd ?
                  b->remainToTransfer :
                  b->circularBufEnd - b->transferPtr ;
-
+      LOG_I(HW,"flushInput place 5\n");
       ssize_t sz=recv(fd, b->transferPtr, blockSz, MSG_DONTWAIT);
 
       if ( sz < 0 ) {
@@ -657,8 +682,10 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
           LOG_E(HW,"UEsock: %d Tx/Rx shift too large Tx:%lu, Rx:%lu\n", fd, t->lastWroteTS, b->lastReceivedTS);
 
         pthread_mutex_unlock(&Sockmutex);
+        LOG_I(HW,"flushInput place 6\n");
         b->transferPtr=(char *)&b->circularBuf[((b->lastReceivedTS+NUM_DELAY*30720)*b->th.nbAnt)%CirSize]; //add_yjn
         b->remainToTransfer=sampleToByte(b->th.size, b->th.nbAnt);
+        LOG_I(HW,"flushInput place 7\n");
       }
 
       if ( b->headerMode==false ) {
@@ -791,98 +818,90 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
       if (t->poll_telnetcmdq)
         t->poll_telnetcmdq(t->telnetcmd_qid,t);
 
+      LOG_I(HW,"Start add CFO\n");
       for (int a=0; a<nbAnt; a++) {//loop over number of Rx antennas
+
         // add_yjn
         int samples_per_subframe = 2 * 30720;
         float s_time = 1 / (1.0e3 * samples_per_subframe);      // sampling time
         static float freq_offset_dynamic = 0;                   //动态频偏 (-60k, 60k)
-        static float freq_offset_static = 46320;                    //静态频偏 
-        static int flag = 1;                                    //1 The initial dynamic frequency offset increases; -1 the initial dynamic frequency offset decreases; 0 without dynamic frequency offset
+        static float freq_offset_static = 0;                    //静态频偏 
+        static int flag = 0;                                    //1 The initial dynamic frequency offset increases; -1 the initial dynamic frequency offset decreases; 0 without dynamic frequency offset
         int freq_offset_samples_step = samples_per_subframe/2;  //The sampling number of dynamic frequency offset changes; 0.35Hz per time slot, and the current change is in the unit of time slot.
-        float freq_offset_change_step = 0.35;                   
-        int32_t* tx_data =  (int32_t *)(&(ptr->circularBuf[0]));  //CirSize is the number of samples to the circularBuf
+        float freq_offset_change_step = 0.35;        
+        LOG_I(HW,"Add CFO Place 1\n");           
+        int32_t* tx_data =  (int32_t *)(&(ptr->circularBuf[0].r));  //CirSize is the number of samples to the circularBuf
         int64_t fre_offset_timestamp_start = 0;
         int64_t fre_offset_timestamp_end = 0;
         int i = 0;
-
-
- 
-        // for (int i=0; i<16;i++)
-        // {
-        //   printf("==============data[i]=%d\n",tx_data[(t->nextTimestamp)%CirSize+i]);
-        // }
-        for (i=0; i<(nsamps/freq_offset_samples_step); i++){
-          /*Determine whether the sampling point exceeds the buffer boundary*/
-          fre_offset_timestamp_start = (((t->nextTimestamp)%CirSize + i * freq_offset_samples_step) < CirSize)?  ((t->nextTimestamp)%CirSize + i * freq_offset_samples_step) : ((t->nextTimestamp)%CirSize + i * freq_offset_samples_step)%CirSize;
-
-          if (((t->nextTimestamp)%CirSize + i * freq_offset_samples_step) < CirSize) //第一个点没越界，看第二个是否越界；
-            fre_offset_timestamp_end = (((t->nextTimestamp)%CirSize + (i+1) * freq_offset_samples_step) < CirSize)? ((t->nextTimestamp)%CirSize + (i+1) * freq_offset_samples_step) : CirSize;
+          
+        for (i=0; i<(nsamps/freq_offset_samples_step); i++)     
+        {
+          LOG_I(HW,"Add CFO Place 2\n");     
+          fre_offset_timestamp_start = (((t->nextTimestamp)%CirSize + (i * freq_offset_samples_step)) < CirSize)?  ((t->nextTimestamp)%CirSize + (i * freq_offset_samples_step)) : ((t->nextTimestamp)%CirSize + (i * freq_offset_samples_step))%CirSize;
+          //LOG_I(HW,"running!!!!!  (t->nextTimestamp) + (i * freq_offset_samples_step) = %ld\n",((t->nextTimestamp) + (i * freq_offset_samples_step));  
+          if (((t->nextTimestamp)%CirSize + (i * freq_offset_samples_step)) < CirSize) 
+            {
+              fre_offset_timestamp_end = (((t->nextTimestamp)%CirSize + (i+1) * freq_offset_samples_step) < CirSize)?  ((t->nextTimestamp)%CirSize + (i+1) * freq_offset_samples_step) : CirSize;
+              LOG_I(HW,"running!!!!!  fre_offset_timestamp_end = %ld\n",fre_offset_timestamp_end);     
+            }
           else if (((t->nextTimestamp)%CirSize + i * freq_offset_samples_step) >= CirSize) 
             fre_offset_timestamp_end = ((t->nextTimestamp)%CirSize + (i+1) * freq_offset_samples_step)%CirSize;
-          
-          /*Set dynamic frequency offset growth according to flag*/
-          if (flag == 1){
+
+          LOG_I(HW,"fre_offset_timestamp_start = %ld, fre_offset_timestamp_end = %ld\n",fre_offset_timestamp_start,fre_offset_timestamp_end);     
+          LOG_I(HW,"Add CFO Place 3\n");     
+          if (flag == 1)
+          {
             freq_offset_dynamic = freq_offset_dynamic + freq_offset_change_step;
-            if(freq_offset_dynamic >= 59999.7) flag = -1;
-          }else if (flag == -1){
+            if(freq_offset_dynamic == 60000) flag = -1;
+          }
+          else if (flag == -1)
+          {
             freq_offset_dynamic = freq_offset_dynamic - freq_offset_change_step;
-            if(freq_offset_dynamic <= -59999.7) flag = 1;
-          }else {
+            if(freq_offset_dynamic == -60000) flag = 1;
+          }
+          else 
+          {
             freq_offset_dynamic = 0;
           }
-
-          /*  */
-          //LOG_W(HW, "=============================================================================================\n");
+          LOG_I(HW,"Add CFO Place 4\n");     
           float freq_offset = freq_offset_static + freq_offset_dynamic;
-          double off_angle = 2 * M_PI * s_time * (freq_offset);  // offset rotation angle compensation per sample
-          if(fre_offset_timestamp_end == CirSize){  //针对最后一个点越界，第一个点每越界
-            cfo_compensation(tx_data, fre_offset_timestamp_start, CirSize, off_angle);
+          double off_angle = -2 * M_PI * s_time * (freq_offset);  // offset rotation angle compensation per sample
+          if(fre_offset_timestamp_end == CirSize){
+            LOG_I(HW,"Outside cfo_compensation 1\n");     
+            cfo_compensation(tx_data, fre_offset_timestamp_start, fre_offset_timestamp_end, off_angle);
+            LOG_I(HW,"Outside cfo_compensation 3\n"); 
             cfo_compensation(tx_data, 0, ((t->nextTimestamp)%CirSize + (i+1) * freq_offset_samples_step)%CirSize, off_angle);
-            //LOG_W(HW, "cfo_compensation start is %ld,end is %ld\n",fre_offset_timestamp_start,((t->nextTimestamp)%CirSize + (i+1) * freq_offset_samples_step)%CirSize);
           }else{
-            cfo_compensation(tx_data, fre_offset_timestamp_start, fre_offset_timestamp_end, off_angle);//针对都越界或都没越界
-           // LOG_W(HW, "cfo_compensation start is %ld,end is %ld\n",fre_offset_timestamp_start,fre_offset_timestamp_end);
-          } 
+            LOG_I(HW,"Outside cfo_compensation 2\n");     
+             cfo_compensation(tx_data, fre_offset_timestamp_start, fre_offset_timestamp_end, off_angle);
+          }
         }
-        
-
         /* The number of sampling points less than one time slot is the frequency offset of the previous time slot */
-        if(nsamps-i*freq_offset_samples_step){
-          fre_offset_timestamp_start = (((t->nextTimestamp)%CirSize + i * freq_offset_samples_step) < CirSize)?  ((t->nextTimestamp)%CirSize + i * freq_offset_samples_step) : ((t->nextTimestamp)%CirSize + i * freq_offset_samples_step)%CirSize;
+        if(nsamps-i*freq_offset_samples_step)                 
+        {
+          LOG_I(HW,"Add CFO Place 5\n");     
+          fre_offset_timestamp_start = (((t->nextTimestamp)%CirSize+ i* freq_offset_samples_step) < CirSize)?  ((t->nextTimestamp)%CirSize + i* freq_offset_samples_step) : ((t->nextTimestamp)%CirSize + i* freq_offset_samples_step)%CirSize;
 
-          if (((t->nextTimestamp)%CirSize + i * freq_offset_samples_step) < CirSize) 
+          if (((t->nextTimestamp)%CirSize + i* freq_offset_samples_step) < CirSize) 
             fre_offset_timestamp_end = (((t->nextTimestamp)%CirSize + nsamps) < CirSize)? ((t->nextTimestamp)%CirSize + nsamps) : CirSize;
           else if (((t->nextTimestamp)%CirSize + i * freq_offset_samples_step) >= CirSize) 
             fre_offset_timestamp_end = ((t->nextTimestamp)%CirSize + nsamps)%CirSize;
 
-          if(nsamps-i*freq_offset_samples_step > 20700)
-          {
-            if (flag == 1) freq_offset_dynamic += 0.35;
-            else if (flag == -1) freq_offset_dynamic -= 0.35;
-              static int32_t count_unint = 0;
-              // printf("count_unint = %d\n",count_unint);
-              count_unint++;
-          }
-
           float freq_offset = freq_offset_static + freq_offset_dynamic;
-          double off_angle = 2 * M_PI * s_time * (freq_offset);  // offset rotation angle compensation per sample
-          if(fre_offset_timestamp_end == CirSize){
+          double off_angle = -2 * M_PI * s_time * (freq_offset);  // offset rotation angle compensation per sample
+          if(fre_offset_timestamp_end == CirSize)
+          {
+             LOG_I(HW,"Outside cfo_compensation 3\n"); 
             cfo_compensation(tx_data, fre_offset_timestamp_start, CirSize, off_angle);
             cfo_compensation(tx_data, 0, ((t->nextTimestamp)%CirSize + nsamps)%CirSize, off_angle);
-            //LOG_W(HW, "cfo_compensation start is %ld,end is %ld\n",fre_offset_timestamp_start,((t->nextTimestamp)%CirSize + nsamps)%CirSize);
           }else{
-            cfo_compensation(tx_data, fre_offset_timestamp_start, fre_offset_timestamp_end, off_angle);//针对都越界或都没越界
-           // LOG_W(HW, "cfo_compensation start is %ld,end is %ld\n",fre_offset_timestamp_start,fre_offset_timestamp_end);
+            LOG_I(HW,"Outside cfo_compensation 4\n"); 
+            cfo_compensation(tx_data, fre_offset_timestamp_start, fre_offset_timestamp_end, off_angle);
           } 
         }
-        // LOG_W(HW, "=============================================================================================\n");
-        // for (int i=0; i<16;i++)
-        // {
-        //   printf("==============data[i]=%d\n",tx_data[(t->nextTimestamp)%CirSize+i]);
-        // }
 
-        // printf("===============================freq_offset_static = %f\n",freq_offset_static);
-        // printf("===============================freq_offset_dynamic = %f\n",freq_offset_dynamic);
+        //printf("===============================freq_offset_dynamic = %f\n",freq_offset_dynamic);
 
         
         if ( ptr->channel_model != NULL ) // apply a channel model
@@ -905,10 +924,8 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
 
           sample_t *out=(sample_t *)samplesVoid[a];
           int nbAnt_tx = ptr->th.nbAnt;//number of Tx antennas
-          // LOG_W(HW, "Read Ant%d, ",a);
-          // LOG_W(HW, "nbAnt_tx%d\n",nbAnt_tx);
-          // LOG_W(HW, "circularBuf start is %ld,end is %ld\n",((t->nextTimestamp)*nbAnt_tx+nbAnt_tx-1)%CirSize,((t->nextTimestamp+nsamps)*nbAnt_tx+nbAnt_tx-1)%CirSize);
-          // LOG_W(HW, "=============================================================================================\n");//LOG_I(HW, "no channel modle nbAnt_tx %d\n",nbAnt_tx);
+
+          //LOG_I(HW, "no channel modle nbAnt_tx %d\n",nbAnt_tx);
           for (int i=0; i < nsamps; i++) {//loop over nsamps
             for (int a_tx=0; a_tx<nbAnt_tx; a_tx++) { //sum up signals from nbAnt_tx antennas
               //printf("====================================no channel modle nbAnt_tx = %d\n",nbAnt_tx);
