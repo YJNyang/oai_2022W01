@@ -69,7 +69,7 @@
     {"if_freq" ,                 CONFIG_HLP_IF_FREQ,     0,               u64ptr:&(UE->if_freq),              defuintval:0,          TYPE_UINT64,0}, \
     {"if_freq_off" ,             CONFIG_HLP_IF_FREQ_OFF, 0,               iptr:&(UE->if_freq_off),            defuintval:0,          TYPE_INT,   0}, \
     {"do-prb-interpolation",     CONFIG_HLP_PRBINTER,    PARAMFLAG_BOOL,  iptr:&(UE->prb_interpolation),      defintval:0,           TYPE_INT,   0}, \
-    {"ffo-corr-shift",             NULL,                   0,               iptr:&(fp->ffo_corr_shift),            defintval:5,          TYPE_INT,   0}, \
+    {"ffo-corr-shift",             NULL,                   0,               iptr:&(fp->ffo_corr_shift),            defintval:0,          TYPE_INT,   0}, \
     {"ue-timing-correction-disable", CONFIG_HLP_DISABLETIMECORR, PARAMFLAG_BOOL, iptr:&(UE->no_timing_correction), defintval:0,      TYPE_INT,   0}, \
 }
 

@@ -796,8 +796,8 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
         int samples_per_subframe = 2 * 30720;
         float s_time = 1 / (1.0e3 * samples_per_subframe);      // sampling time
         static float freq_offset_dynamic = 0;                   //动态频偏 (-60k, 60k)
-        static float freq_offset_static = -17320;                    //静态频偏 
-        static int flag = 1;                                    //1 The initial dynamic frequency offset increases; -1 the initial dynamic frequency offset decreases; 0 without dynamic frequency offset
+        static float freq_offset_static = -45320;                    //静态频偏 
+        static int flag = 0;                                    //1 The initial dynamic frequency offset increases; -1 the initial dynamic frequency offset decreases; 0 without dynamic frequency offset
         int freq_offset_samples_step = samples_per_subframe/2;  //The sampling number of dynamic frequency offset changes; 0.35Hz per time slot, and the current change is in the unit of time slot.
         float freq_offset_change_step = 0.35;                   
         int32_t* tx_data =  (int32_t *)(&(ptr->circularBuf[0]));  //CirSize is the number of samples to the circularBuf
